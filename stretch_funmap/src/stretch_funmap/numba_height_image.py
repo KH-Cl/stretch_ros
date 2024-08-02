@@ -53,6 +53,80 @@ def numba_max_height_image_to_points_int(points_in_image_to_frame_mat, image, po
                 i += 1
     return i
 
+@njit(parallel=True, fastmath=True)
+def numba_max_height_image_to_occupancy_points_int(points_in_image_to_frame_mat, image, points, m_per_pix, m_per_height_unit):
+    '''
+    Convert points into grid following guidelines of:
+
+    Unknown value = -1
+    Known value within floor bounds = 100
+    Known value outside of floor bounds = 0
+
+    :param points_in_image_to_frame_mat: x,y,z from transformed image
+    :param image: (MaxHeightImage) image points are from
+    :param points: matrix points will be stored in
+    :param m_per_pix: meters per pixel for this image
+    :param m_per_height_unit: meters per height unit for this image
+    '''
+
+    # Update the max height image to represent the provided 3D
+    # points. This function is for images with integer pixels.
+    im_height, im_width = image.shape
+
+    # Unpack the affine transformation matrix that transforms points
+    # from the image's coordinate system to a target frame.
+    r00, r01, r02, t0 = points_in_image_to_frame_mat[0]
+    r10, r11, r12, t1 = points_in_image_to_frame_mat[1]
+    r20, r21, r22, t2 = points_in_image_to_frame_mat[2]
+
+    # Bounds for what heights can be considered floor
+    min_floor = -0.1
+    max_floor = 0.1
+    
+    for y_i in range(im_height):
+        for x_i in range(im_width):
+            val = image[y_i, x_i]
+            # check if observed
+            if val != 0:
+                # observed, so create a point
+                z_i = val - 1
+
+                x_m = x_i * m_per_pix
+                y_m = y_i * -m_per_pix
+                z_m = z_i * m_per_height_unit
+                
+                x_f = (r00 * x_m) + (r01 * y_m) + (r02 * z_m) + t0
+                y_f = (r10 * x_m) + (r11 * y_m) + (r12 * z_m) + t1
+                z_f = (r20 * x_m) + (r21 * y_m) + (r22 * z_m) + t2
+
+                # convert the x and y values back into pixel values (will act as index for points matrix)
+                x = round((x_f / m_per_pix) + (im_width/2))
+                y = round((-1 * y_f / m_per_pix) + (im_height/2)) # KARA NOTE: I think this is the one that I switch the polarity of but not 100 so really need to test
+
+                # if point is floor, assign zero otherwise assign 100
+                points[y,x] = 0 if z_f > max_floor or z_f < min_floor else 100
+
+
+@njit(parallel=True, fastmath=True)
+def compress_occupancy_grid(points):
+    '''
+    Compress points into a 50 x 50 occupancy grid
+    :param points: matrix of points designating whether pixels are unknown and whether they are floor
+    :return: compressed 50 x 50 occupancy grid
+    '''
+    grid = np.array((50,50))
+    im_height, im_width = points.shape
+
+    # find a value to compress pixels by in order to fit pixels within 50 x 50 grid
+    scale = min(math.floor(im_height/50), math.floor(im_width/50))
+
+    for y_i in range(50):
+        for x_i in range(50):
+            # find and assign average of blocks to grid
+            grid[y_i, x_i] = math.floor(np.mean(points[y_i*scale:(y_i + 1)*scale, x_i*scale:(x_i + 1)*scale]))
+            
+    return grid
+
 
 
 @njit(fastmath=True)

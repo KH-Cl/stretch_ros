@@ -8,6 +8,9 @@ from stretch_funmap.numba_sample_ridge import numba_sample_ridge, numba_sample_r
 import stretch_funmap.segment_max_height_image as sm
 import hello_helpers.hello_misc as hm
 
+# new import
+import math
+
 ####################################################
 # DISPLAY FUNCTIONS
 
@@ -147,6 +150,71 @@ def plan_a_path(max_height_im, robot_xya_pix, end_xy_pix, floor_mask=None):
         return None, 'Failed to create distance map and traversable mask.'
 
     path = find_min_cost_path(easy_distance_map, start_xy, end_xy_pix)
+    if path is None:
+        message='Unable to find a path to the new head scan location.'
+        return path, message
+
+    # Approximate the pixel path on the image map with a line
+    # segment path.
+    max_error_m = 0.05
+    line_segment_path = approximate_with_line_segment_path(path, max_error_m, m_per_pix, verbose=False)
+    message = 'Path found!'
+    return line_segment_path, message
+
+
+def plan_a_unity_path(max_height_im, robot_xya_pix, end_xy_pix, floor_mask=None):
+    '''
+    Generate a path to the clicked point on the user interface if possible
+    :param max_height_im: (MaxHeightImage) current map of surroundings
+    :param robot_xya_pix: (int, int, int)current position robot is at
+    :param end_xy_pix: (int) index within user interface's grid the user clicked on
+    :param floor_mask: mask designating floor
+    :return: (int[][], string) path to point, success/error message
+    '''
+    # Transform the robot's current estimated pose as represented
+    # by TF2 to the map image. Currently, the estimated pose is
+    # based on the transformation from the map frame to the
+    # base_link frame, which is updated by odometry and
+    # corrections based on matching head scans to the map.
+    m_per_pix = max_height_im.m_per_pix
+
+    robot_x_pix = int(round(robot_xya_pix[0]))
+    robot_y_pix = int(round(robot_xya_pix[1]))
+    robot_ang_rad = robot_xya_pix[2]
+    
+    start_xy = np.array([robot_x_pix, robot_y_pix])
+    
+    # ensure that end_xy_pix has the correct type for Cython
+    # end_xy_pix = np.int64(np.round(np.array(end_xy_pix)))
+    
+    easy_distance_map, traversable_mask = distance_map(max_height_im, robot_xya_pix, floor_mask=None)
+
+    if (easy_distance_map is None) or (traversable_mask is None):
+        return None, 'Failed to create distance map and traversable mask.'
+    
+    # Map index of clicked point into a pixel value understandable to cython code
+    im_height, im_width = max_height_im.image.shape
+    # scale of how many pixels wide each ui cell represents
+    scale = min(math.floor(im_height/50), math.floor(im_width/50))
+    # y_ind = end_xy_pix / 50
+    # x_ind = end_xy_pix % 50
+    # put index in xy terms
+    xy_ind = np.unravel_index(end_xy_pix, (50,50))
+
+    # within area that translates to the ui cell, find the pixel that is the farthest away from an obstacle (reasoning: most likely to have a valid path to it)
+    local_max_ind = np.argmax(easy_distance_map[xy_ind[0]*scale:(xy_ind[0]+1)*scale, xy_ind[1]*scale:(xy_ind[1]+1)*scale])
+    # translate the index within the area of the ui cell into an index
+    local_max_pix = np.unravel_index(local_max_ind, (scale, scale))
+
+    # add the local index to the global index known of the ui cell position
+    global_x = local_max_pix[1] + (xy_ind[1]*scale)
+    global_y = local_max_pix[0] + (xy_ind[0]*scale)
+
+    # KARA NOTE: not sure if these orientations are correct so definetely need some testing (。﹏。*)
+    global_xy_pix = np.int64(np.array(global_x, global_y))
+
+    # Find min cost path to cell
+    path = find_min_cost_path(easy_distance_map, start_xy, global_xy_pix)
     if path is None:
         message='Unable to find a path to the new head scan location.'
         return path, message

@@ -487,6 +487,30 @@ class MaxHeightImage:
         points = points[:num_points]
 
         return points
+    
+    def to_occupancy_grid(self):
+        '''
+        Returns max height image as a compressed 50 x 50 occupancy grid
+        '''
+        h, w = self.image.shape
+
+        # Points in matrix intialized to -1 because -1 will represent an unmapped
+        points = np.fill((h,w), -1)
+
+        points_in_image_to_voi = np.identity(4)
+        points_in_image_to_voi[:3, 3] = self.image_origin
+        points_in_image_to_frame_id_mat = np.matmul(self.voi.points_in_voi_to_frame_id_mat, points_in_image_to_voi)
+        
+        if self.transform_corrected_to_original is not None: 
+            points_in_image_to_frame_id_mat = np.matmul(points_in_image_to_frame_id_mat, self.transform_corrected_to_original)
+
+        # convert point values into unknown, floor, and nonfloor values and reorient
+        nh.numba_max_height_image_to_occupancy_points_int(points_in_image_to_frame_id_mat, self.image, points, self.m_per_pix, self.m_per_height_unit)
+
+        # compress points into averaged blocks in a 50 x 50 grid 
+        compressed_occupancy_grid = nh.compress_occupancy_grid(points)
+
+        return compressed_occupancy_grid
 
 
     def from_points(self, points_to_voi_mat, points):
