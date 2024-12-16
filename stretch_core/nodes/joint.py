@@ -16,15 +16,15 @@ class Joint:
 
     These names are consistent with the Hello Robot GitHub repository.
     """
-    HEAD_PAN = 'head_pan'
-    HEAD_TILT = 'head_tilt'
-    BASE_TRANSLATE = 'base_translate'
-    BASE_ROTATE = 'base_rotate'
+    HEAD_PAN = 'joint_head_pan'
+    HEAD_TILT = 'joint_head_tilt'
+    BASE_TRANSLATE = 'translate_mobile_base'
+    BASE_ROTATE = 'rotate_mobile_base'
     BASE = 'base'
-    LIFT = 'lift'
-    ARM = 'arm'
-    WRIST_YAW = 'wrist_yaw'
-    GRIPPER = 'stretch_gripper'
+    LIFT = 'joint_lift'
+    ARM = 'wrist_extension'
+    WRIST_YAW = 'joint_wrist_yaw'
+    GRIPPER = 'joint_gripper_finger_left'
 
     RANGE_OF_MOTION_DICT = {
         HEAD_PAN: (-2.80, 2.90),    # radians

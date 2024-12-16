@@ -191,6 +191,14 @@ class GetKeyboardCommands:
             trigger_result = node.trigger_lower_until_contact_service(trigger_request)
             rospy.loginfo('trigger_result = {0}'.format(trigger_result))
             command = 'service_occurred'
+
+        # KARA TODO: insert new command to save a modified version of the funmap 
+        # can format it like above
+        if ((c == '3') or (c == '#')) and self.mapping_on:
+            trigger_request = TriggerRequest()
+            trigger_result = node.trigger_compressed_map_save(trigger_request)
+            rospy.loginfo('trigger_result = {0}'.format(trigger_result))
+            command = 'service_occurred'
             
         
         ####################################################

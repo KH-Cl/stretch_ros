@@ -465,6 +465,75 @@ class FunmapNode(hm.HelloNode):
             message=message
         )
 
+    # KARA ADDED
+    def img_to_occupancy_grid(self, image):
+        '''
+        Convert max height image into a compressed occupancy grid message to communicate what is floor
+        :param image: (MaxHeightImage) Image to convert into occupancy grid
+        :returns: (OccupancyGrid) 50 x 50 Occupancy Grid message representing the current merged map
+        '''
+        # temp placing these here in case we don't use this
+        from std_msgs.msg import Bool, Header, Int32
+        from nav_msgs.msg import OccupancyGrid, MapMetaData
+        from geometry_msgs.msg import Pose, Point, Quaternion
+
+        # Calculations to generate compressed occupancy grid
+        grid = image.to_occupancy_grid()
+
+        img_height, img_width = image.shape
+        grid_height, grid_width = grid.shape # This should be 50 x 50 at the moment
+
+        # Generate header
+        header = Header()
+        header.seq = 0
+        header.stamp = rospy.Time.now()
+        header.frame_id = 'map state'
+
+        # Generate metadata
+        metadata = MapMetaData()
+        metadata.map_load_time = rospy.Time.now()
+        # width of cell in pixels * meters per pixel = width of cell in meters
+        metadata.resolution = min(math.floor(img_height/grid_height), math.floor(img_width/grid_width)) * image.m_per_pix
+        metadata.width = grid_width
+        metadata.height = grid_height
+        
+        pose = Pose()
+        position = Point()
+        orientation = Quaternion()
+        position.x, position.y, position.z = 0.0, 0.0, 0.0 # KARA TODO: I pulled this from self.robot_poses previously and then tried to scale it to the map
+        orientation.x, orientation.y, orientation.z, orientation.w = 0.0, 0.0, 0.0, 0.0
+        pose.position = position
+        pose.orientation = orientation
+        metadata.origin = pose
+
+        # Adding pieces to final message
+        msg = OccupancyGrid()
+        msg.header = header
+        msg.info = metadata
+        msg.data = grid.flatten()
+        
+        return msg
+    
+    # KARA TODO: insert triggered map save here
+    def trigger_compressed_map_save(self, request):
+        # TODO ensure msg is correct and save it to a file (probably )
+        msg = self.img_to_occupancy_grid(self.merged_map.max_height_img)
+
+        # TODO: gotta install this one I think
+        from rospy_message_converter import message_converter
+        msg_dict = message_converter.convert_ros_message_to_dictionary(message)
+
+        import json
+        with open('funmap_data.json', 'w', encoding='utf-8') as f:
+            json.dump(msg_dict, f, ensure_ascii=False, indent=4)
+
+        success = 'True'
+        message = 'Compressed 3D map saved'
+        return TriggerResponse(
+            success=success,
+            message=message
+        )
+
     def trigger_global_localization_service_callback(self, request):
         self.perform_head_scan(localize_only=True, global_localization=True)
         return TriggerResponse(

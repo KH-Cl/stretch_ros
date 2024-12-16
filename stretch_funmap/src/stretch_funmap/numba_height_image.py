@@ -83,8 +83,9 @@ def numba_max_height_image_to_occupancy_points_int(points_in_image_to_frame_mat,
     min_floor = -0.1
     max_floor = 0.1
     
-    for y_i in range(im_height):
-        for x_i in range(im_width):
+    # inserted downsampling so only using about half of points
+    for y_i in range(0, im_height, 2):
+        for x_i in range(0, im_width, 2):
             val = image[y_i, x_i]
             # check if observed
             if val != 0:
@@ -120,6 +121,7 @@ def compress_occupancy_grid(points):
     # find a value to compress pixels by in order to fit pixels within 50 x 50 grid
     scale = min(math.floor(im_height/50), math.floor(im_width/50))
 
+    # This is also an area for potential downsampling
     for y_i in range(50):
         for x_i in range(50):
             # find and assign average of blocks to grid

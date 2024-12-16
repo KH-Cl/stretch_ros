@@ -12,12 +12,11 @@
 import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
-import stretch_body.robot
-from JointCommandManager import JointCommandManager
-from JointStateManager import JointStateManager
-from JointController import JointController
+#import stretch_body.robot
+from joint_command_manager import JointCommandManager
+from joint_controller import JointController
 from stretch_control.msg import JointCommands, SingleJointCommand
-from ModeManager import ModeManager
+#from ModeManager import ModeManager
 
 
 class StretchControlEngine:
